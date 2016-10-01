@@ -4,7 +4,7 @@ In this post I'm going to make the case for a somewhat unpopular opinion - using
 
 ## The Story
 
-I've seen this happening multiple times: you and a few teammates are starting a new project. The project is some complicated system that comprises several processes. You `git init` a new repo for each process without thinking about it too much, it feels natural. 
+I've seen this happening multiple times: your team is starting a new project, some complicated system that comprises several processes. You `git init` a new repo for each process without thinking about it too much, it feels natural. 
 
 As the system evolves, the processes start talking to each other over RPC, and since the processes use different programming languages, you use something like `protobuf` or `thrift`. Your new `.proto/.thrift` files are used by multiple components, so they don't belong in any of the repos you created. You go ahead an create a new git repo and stick the shared API stuff in it.
 
@@ -79,10 +79,11 @@ Here are some common arguments that people have against using a single repo, and
 * *"If I have an integration branch that comprises commits from different teams, it will be harder to rebase it on master"* - that is true, but it guarantees that when you do rebase over master, all the code is synced. With multiple repos, you get no such guarantee, and things will probably break after you rebase.
 * *"I don’t want to clone the entire product, it’s too big"* - cloning does not happen often. And if the Linux Kernel could be version controlled in a single repo, why do you need more?
 
-## Interesting Examples
+## Interesting Examples and Further Reading
 * http://www.wired.com/2015/09/google-2-billion-lines-codeand-one-place/[Google Is 2 Billion Lines of Code—And It’s All in One Place]
 * http://blog.jupyter.org/2015/04/15/the-big-split/[Project Jupyter's "The Big Split"]
 * https://github.com/torvalds/linux[Linux Kernel]
+* http://programmers.stackexchange.com/questions/161293/choosing-between-single-or-multiple-projects-in-a-git-repository[This] and http://programmers.stackexchange.com/questions/206668/using-multiple-git-repositories-instead-of-a-single-one-containing-many-apps-fro?newreg=ff91b337b735450c9254c688320da968[this] on StackExchange
 
 
 ## Bottom Line
