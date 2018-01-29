@@ -1,3 +1,197 @@
-<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title><![CDATA[Untitled RSS Feed]]></title><description><![CDATA[Untitled RSS Feed]]></description><link>https://MatanRubin.github.io</link><generator>RSS for Node</generator><lastBuildDate>Mon, 15 Aug 2016 09:14:53 GMT</lastBuildDate><atom:link href="https://MatanRubin.github.io/rss/" rel="self" type="application/rss+xml"/><ttl>60</ttl><item><title><![CDATA[Testing 1, 2, 3...]]></title><description><![CDATA[<div class="paragraph">
-<p>This will someday contain something interesting.</p>
-</div>]]></description><link>https://MatanRubin.github.io/2016/08/07/Testing-1-2-3.html</link><guid isPermaLink="true">https://MatanRubin.github.io/2016/08/07/Testing-1-2-3.html</guid><dc:creator><![CDATA[Matan Rubin]]></dc:creator><pubDate>Sun, 07 Aug 2016 00:00:00 GMT</pubDate></item></channel></rss>
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title><![CDATA[Untitled RSS Feed]]></title><description><![CDATA[Untitled RSS Feed]]></description><link>https://MatanRubin.github.io</link><generator>RSS for Node</generator><lastBuildDate>Mon, 29 Jan 2018 15:24:57 GMT</lastBuildDate><atom:link href="https://MatanRubin.github.io/rss/" rel="self" type="application/rss+xml"/><ttl>60</ttl><item><title><![CDATA[The Dangers of Multirepo]]></title><description><![CDATA[<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>In this post I&#8217;m going to make the case for a somewhat unpopular opinion - using multiple git repos (AKA multirepo) is unnecessary and dangerous in many cases. A single git repo (AKA monorepo) is simpler and satisfies the requirements of many projects.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_the_story">The Story</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>I&#8217;ve seen this happening multiple times: your team is starting a new project, some complicated system that comprises several processes. You <code>git init</code> a new repo for each process without thinking about it too much, it feels natural.</p>
+</div>
+<div class="paragraph">
+<p>As the system evolves, the processes start talking to each other over RPC, and since the processes use different programming languages, you use something like <code>protobuf</code> or <code>thrift</code>. Your new <code>.proto/.thrift</code> files are used by multiple components, so they don&#8217;t belong in any of the repos you created. You go ahead an create a new git repo and stick the shared API stuff in it.</p>
+</div>
+<div class="paragraph">
+<p>Being a great software engineer, you always write unit tests for your code, and that fits snugly in your component&#8217;s repo. A few weeks later, the system is a bit more mature and you want to start adding integration testing between components and system level testing to test the entire thing. But that doesn&#8217;t really fit in any component&#8217;s repo, and it&#8217;s certainly not a shared-api thingy, so you create another repo for system testing.</p>
+</div>
+<div class="paragraph">
+<p>Later on you realize that two of the components can share some piece of infrastructure code, so you create a library out of it and put that in its own repo.</p>
+</div>
+<div class="paragraph">
+<p>Then you want some "magic script" to build your entire system from scratch and produce a shipable product, so you write it up. But where do you put it? Doesn&#8217;t seem to fit in any of the repos you created&#8230;&#8203; So you create a new repo for build stuff.</p>
+</div>
+<div class="paragraph">
+<p>Without noticing, you&#8217;ve just created ~10 git repositories for a single product. Welcome to MultiRepo Hell.</p>
+</div>
+<div class="paragraph">
+<p>While the above example sound extreme, I&#8217;ve actually seen this happen more than once. We&#8217;ll now examine why this is a terrible way to go.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_multirepo_hell">MultiRepo Hell</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>There are a lot of consequences to going MultiRepo, so the list below is not complete.</p>
+</div>
+<div class="sect3">
+<h4 id="_versioning">Versioning</h4>
+<div class="paragraph">
+<p>Unless your APIs are simple, stable and well defined, you&#8217;re going to need a way to specify which version process A knows how to talk to which version of process B. This means that <strong>every git repo must be versioned in a sensible way</strong>. And while "sensible" sounds simple enough, it is not (and that might deserve its own blog post). In a nutshell, by sensible I mean that you should be able to specify a dependency on some feature, some bugfix, or some API version. This quickly becomes a headache as developers must keep updating their component&#8217;s version. When they forget to do so, the entire system might be in an inconsistent state, where components do not agree on which version of some other component they want to use.</p>
+</div>
+<div class="paragraph">
+<p>Multirepo creates a ton of interdependencies that simply do not exist in Monorepo, since in monorepo there is only one state of the code - the current commit - and not some combinatorial monster that depends on the exact state of each repo.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_build_time_dependencies">Build-Time Dependencies</h4>
+<div class="paragraph">
+<p>In many software projects (especially in C/C++) it is common to have multiple processes share code in the form of a library. This often means that you must build the librbary <em>before</em> you build the dependent process (this is especially true when using static libraries). As a consequence, your upper level build script (which resides in the so called "build" repo) must know in which order to build the components. Moreover, a dependent component must know the relative location of the component it depends on, and it must rely on that component to be built before itself. Yuck.</p>
+</div>
+<div class="paragraph">
+<p>In Monorepo, relative locations between components are well known - each one has a directory under the root directory. That simplifies relative path issues between components ("where the heck is that <code>include</code> folder?"), and makes the upper level build script much simpler.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_run_time_dependencies">Run-Time Dependencies</h4>
+<div class="paragraph">
+<p>Assuming that your components are properly versioned, how do you make sure that the contents of your final package/ISO make sense? In other words, how can you tell that the dependencies between components make sense? For example, if componentA requires componentB-1.0 but componentC requires componentB-2.0, a possible consequence is an install time failure, or even worse - a run time failure. A possible solution is creating some verification step that makes sure the dependencies make sense. Oh man&#8230;&#8203;</p>
+</div>
+<div class="paragraph">
+<p>Monorepo simplifies this again simply by having exactly one possible state of your code. If you change a library API, you make the corresponding change in all dependent components in the same commit. Poof, problem solved.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_co_developing">Co-developing</h4>
+<div class="paragraph">
+<p>Let&#8217;s say two developers work on a feature that requires changes to 2 components + their shared API. Each developer creates a feature branch for that feature in its component, and a corresponding branch is created in the shared APIs repo. If any of these branches is merged before the other two, the system is in an inconsistent state. If the API change is a backward compatible API change, or if you use some fancy method such as feature toggles, that might not be a problem. But many times that is not the case, and your entire system can break.</p>
+</div>
+<div class="paragraph">
+<p>One solution I&#8217;ve seen people use is to synchronize the merges between all relevant branches. Don&#8217;t even get me started on how backwards that is&#8230;&#8203;</p>
+</div>
+<div class="paragraph">
+<p>So how does Monorepo compare? In Monorepo you probably just have a feature branch for your new feature. Developers co-develop on that branch (or they use any other git method to co-develop), and when they&#8217;re done developing - they merge. That&#8217;s it.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_test_matrix">Test Matrix</h4>
+<div class="paragraph">
+<p>Because each repo may have its own state, you test matrix goes berserk. You need to mix and match versions of components, make sure they work well together, etc. That is a lot of work, and probably not what you want to be doing when you start a new project. You want a single version, you test it, and if it&#8217;s good - you deploy it.</p>
+</div>
+<div class="paragraph">
+<p>Monorepo, well, you got the gist of it.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_build_reproducability">Build Reproducability</h4>
+<div class="paragraph">
+<p>An important trait of a good build system is the ability to reproduce a specific build precisely. How would you do that in a multirepo system? The answer is that you need to know the exact state of each repo at the time the build was executed. That means that you need to track the exact commit SHA1s for each repository, and your "magic script" now has to know how to check out the exact commit SHA1 for each repository and build it. If you haven&#8217;t done that, you&#8217;re in for some error-prone and tiring manual work to get each repo in to the specific commit. Oh, and by the way, your "build" repo also has to be in the exact state it was when you built that build, so don&#8217;t forget that.</p>
+</div>
+<div class="paragraph">
+<p>Are we having fun yet?</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_what_is_happening_here">What is happening here?</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>At this point you must be asking yourself - what is going on here? There are many projects that use multirepo. Heck, OpenStack is some 350 git repositories. The Jupyter project (which is amazing, BTW) is comprised of 12 repos. They even moved from Monorepo to Multirepo <a href="http://blog.jupyter.org/2015/04/15/the-big-split/">and blogged all about it</a>.</p>
+</div>
+<div class="paragraph">
+<p>The answer is that these projects are usually projects in which the APIs between components are very stable, and/or the components are loosly coupled. The scenario described above is not like that. The main point here is this - in the early days of most projects, the project is essentially a monolith. Even if it is comprised of several processes, logically it is probably a monolith. And a monolith should be source controlled in a single git repository.</p>
+</div>
+<div class="paragraph">
+<p>(Insert here some smart comment for all the people who are about to say "I build microservices". Good for you. Most projects are not built in a microservices architecture).</p>
+</div>
+<div class="paragraph">
+<div class="title">Say, Matan, when <em>should</em> I use MultiRepo?</div>
+<p>MultiRepo is a suitable solution in some cases. Specifically:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>You are developing loosly coupled components with stable APIs which maintain proper backwards compatibility, and are willing to version your stuff and handle all the disadvantages listed above.</p>
+</li>
+<li>
+<p>You need/want to open source some parts of your project but not other parts.</p>
+</li>
+<li>
+<p>You need to restrict permissions to some highly sensitive piece of code in your project.</p>
+</li>
+<li>
+<p>You like suffering.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_counter_arguments">Counter Arguments</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Here are some common arguments that people have against using a single repo, and my thoughts on them:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>"I might want to open source this component some day"</strong> - Ok, when that day comes, break it off in to it’s own repo.</p>
+</li>
+<li>
+<p><strong>"I don’t want to see other teams' commits in my git log"</strong> - first of all, why? If components in the product tightly coupled, commits by other teams are very relevant to your work. If you still want to view just your team&#8217;s history, run “git log .” inside your team’s sub directory.</p>
+</li>
+<li>
+<p><strong>"I don’t want to build the entire product when I make"</strong> - you don’t have to, just run “make” in your team’s sub directory. However, you still can, if you need, build the entire product in a single command.</p>
+</li>
+<li>
+<p><strong>"If I have an integration branch that comprises commits from different teams, it will be harder to rebase it on master"</strong> - that is true, but it guarantees that when you do rebase over master, all the code is synced. With multiple repos, you get no such guarantee, and things will probably break after you rebase.</p>
+</li>
+<li>
+<p><strong>"I don’t want to clone the entire product, it’s too big"</strong> - cloning does not happen often. And if the Linux Kernel could be version controlled in a single repo, why do you need more?</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_interesting_examples_and_further_reading">Interesting Examples and Further Reading</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><a href="http://www.wired.com/2015/09/google-2-billion-lines-codeand-one-place/">Google Is 2 Billion Lines of Code—And It’s All in One Place</a></p>
+</li>
+<li>
+<p><a href="http://blog.jupyter.org/2015/04/15/the-big-split/">Project Jupyter&#8217;s "The Big Split"</a></p>
+</li>
+<li>
+<p><a href="https://github.com/torvalds/linux">Linux Kernel</a></p>
+</li>
+<li>
+<p><a href="http://programmers.stackexchange.com/questions/161293/choosing-between-single-or-multiple-projects-in-a-git-repository">This</a> and <a href="http://programmers.stackexchange.com/questions/206668/using-multiple-git-repositories-instead-of-a-single-one-containing-many-apps-fro?newreg=ff91b337b735450c9254c688320da968">this</a> on StackExchange</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_bottom_line">Bottom Line</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If you are developing a single product, in which all components are tightly coupled and advance together, keep it simple and start out with a single repo. Each component can have its own subdirectory within that repo. The system wide build script/Makefile goes in the root of the repo. System tests get their own directory, and so does the shared APIs <code>proto</code> and <code>thrift</code> files.</p>
+</div>
+<div class="paragraph">
+<p>People often make the mistake of thinking that a git repo corrolates with a single package, a single process, a single language or a single library. In essence, however, git is language agnostic and does not care how many processes, packages and/or libraries it contains.</p>
+</div>
+<div class="paragraph">
+<p>So <a href="https://en.wikipedia.org/wiki/KISS_principle">KISS</a> and start out with a single repo. If you later feel you absolutely must break it into more than one repo - <a href="https://help.github.com/articles/splitting-a-subfolder-out-into-a-new-repository/">it&#8217;s easy to do so</a>.</p>
+</div>
+<div class="paragraph">
+<p>The main take away here is that using Multirepo does not come for free. There&#8217;s a lot of overhead to maintaining multiple git repos, and you should avoid it if subdirectories within a single repo does the job for you.</p>
+</div>
+</div>
+</div>]]></description><link>https://MatanRubin.github.io/2016/08/17/The-Dangers-of-Multirepo.html</link><guid isPermaLink="true">https://MatanRubin.github.io/2016/08/17/The-Dangers-of-Multirepo.html</guid><dc:creator><![CDATA[Matan Rubin]]></dc:creator><pubDate>Wed, 17 Aug 2016 00:00:00 GMT</pubDate></item></channel></rss>
