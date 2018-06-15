@@ -8,5 +8,21 @@
   "socialnetwork": {},
   "theme": {
     "name": "casper"
+  },
+  "urls": {
+    "site": "https://MatanRubin.github.io",
+    "hubpress": "https://matanrubin.github.io",
+    "theme": "//MatanRubin.github.io/themes/casper",
+    "images": "https://MatanRubin.github.io/images"
+  },
+  "initialisationConfigComponent": {
+    "name": "initialise-configuration",
+    "computed": {},
+    "methods": {},
+    "staticRenderFns": [
+      null,
+      null,
+      null
+    ]
   }
 }
